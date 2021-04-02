@@ -546,6 +546,12 @@ int setnice(int pid, int nice)
 		/* ******************** */
 		/* * WRITE YOUR CODE    */
 		/* ******************** */
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    	if((p->pid == pid) || (p->parent->pid == pid)){
+		p->priority = nice;
+		return 0;
+	}
+    }
 
     release(&ptable.lock);
     return -1;
@@ -559,6 +565,11 @@ int getnice(int pid)
 		/* ******************** */
 		/* * WRITE YOUR CODE    */
 		/* ******************** */
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    	if((p->pid == pid) || (p->parent->pid == pid)){
+		return p->priority;
+	}
+    }
 
     release(&ptable.lock);
     return -1;
@@ -574,6 +585,21 @@ void ps(void)
 		/* ******************** */
 		/* * WRITE YOUR CODE    */
 		/* ******************** */
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+	if(p->pid==0)
+		continue;
+	if(p->state==UNUSED)
+		cprintf("%s\t%d \t %s \t %d \t\t %d\n", p->name, p->pid, "UNUSED", p->priority, p->runtime);
+	else if(p->state==EMBRYO)
+		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "EMBRYO", p->priority, p->runtime);
+	else if(p->state==SLEEPING)
+		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "SLEEPING", p->priority, p->runtime);
+	else if(p->state==RUNNABLE)
+		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "RUNNABLE", p->priority, p->runtime);
+	else if(p->state==ZOMBIE)
+		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "ZOMBIE", p->priority, p->runtime);
+
+    }
 
     release(&ptable.lock);
     return;

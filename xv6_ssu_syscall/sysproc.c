@@ -89,3 +89,21 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int 
+sys_setnice(void)
+{
+  return setnice();
+}
+
+int
+sys_getnice(void)
+{
+  return getnice();
+}
+
+void
+sys_ps(void)
+{
+  return ps();
+}
