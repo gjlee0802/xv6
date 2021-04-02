@@ -106,7 +106,7 @@ extern int sys_uptime(void);
 
 extern int sys_setnice(void);
 extern int sys_getnice(void);
-extern int ps(void);
+extern int sys_ps(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,

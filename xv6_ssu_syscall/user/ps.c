@@ -4,7 +4,7 @@
 
 int main(int argc, char **argv)
 {
-	//ps();
+	ps();
 	printf(1, "ps\n");
     exit();
 }

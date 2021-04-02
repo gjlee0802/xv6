@@ -534,7 +534,6 @@ procdump(void)
 }
 
 
-#ifdef PRIORITY
 int setnice(int pid, int nice)
 {
     if( nice < 0 || nice > 30)
@@ -589,20 +588,19 @@ void ps(void)
 	if(p->pid==0)
 		continue;
 	if(p->state==UNUSED)
-		cprintf("%s\t%d \t %s \t %d \t\t %d\n", p->name, p->pid, "UNUSED", p->priority, p->runtime);
+		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "UNUSED", p->priority);
 	else if(p->state==EMBRYO)
-		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "EMBRYO", p->priority, p->runtime);
+		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "EMBRYO", p->priority);
 	else if(p->state==SLEEPING)
-		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "SLEEPING", p->priority, p->runtime);
+		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "SLEEPING", p->priority);
 	else if(p->state==RUNNABLE)
-		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "RUNNABLE", p->priority, p->runtime);
+		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "RUNNABLE", p->priority);
 	else if(p->state==ZOMBIE)
-		cprintf("%s\t%d \t %d \t %d \t\t %d\n", p->name, p->pid, "ZOMBIE", p->priority, p->runtime);
+		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "ZOMBIE", p->priority);
 
     }
 
     release(&ptable.lock);
     return;
 }
-#endif
 

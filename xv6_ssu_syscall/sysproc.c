@@ -93,17 +93,17 @@ sys_uptime(void)
 int 
 sys_setnice(void)
 {
-  return setnice();
+  return setnice(argint(0, &n), argint(1, &n));
 }
 
 int
 sys_getnice(void)
 {
-  return getnice();
+  return getnice(argint(0, &n));
 }
 
-void
+int
 sys_ps(void)
 {
-  return ps();
+  ps();
 }

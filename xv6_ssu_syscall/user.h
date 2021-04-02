@@ -26,7 +26,7 @@ int uptime(void);
 
 int setnice(int, int);
 int getnice(int);
-int ps();
+void ps(void);
 
 // ulib.c
 int stat(const char*, struct stat*);
