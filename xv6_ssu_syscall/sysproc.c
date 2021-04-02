@@ -93,17 +93,29 @@ sys_uptime(void)
 int 
 sys_setnice(void)
 {
-  return setnice(argint(0, &n), argint(1, &n));
+  int pid, priority;
+
+  if(argint(0, &pid) < 0)
+	  return -1;
+  if(argint(1, &priority) < 0)
+	  return -1;
+  
+  return setnice(pid, priority);
 }
 
 int
 sys_getnice(void)
 {
-  return getnice(argint(0, &n));
+  int pid;
+  if(argint(0, &pid) < 0)
+	  return -1;
+
+  return getnice(pid);
 }
 
 int
 sys_ps(void)
 {
   ps();
+  return 0;
 }

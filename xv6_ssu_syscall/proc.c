@@ -88,7 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->priority = 5;	// Default priority
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -199,6 +199,7 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
+  np->priority = curproc->priority;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -215,7 +216,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-
+  
   release(&ptable.lock);
 
   return pid;
@@ -548,6 +549,7 @@ int setnice(int pid, int nice)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     	if((p->pid == pid) || (p->parent->pid == pid)){
 		p->priority = nice;
+		release(&ptable.lock);
 		return 0;
 	}
     }
@@ -566,6 +568,7 @@ int getnice(int pid)
 		/* ******************** */
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     	if((p->pid == pid) || (p->parent->pid == pid)){
+		release(&ptable.lock);
 		return p->priority;
 	}
     }
@@ -590,13 +593,13 @@ void ps(void)
 	if(p->state==UNUSED)
 		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "UNUSED", p->priority);
 	else if(p->state==EMBRYO)
-		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "EMBRYO", p->priority);
+		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "EMBRYO", p->priority);
 	else if(p->state==SLEEPING)
-		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "SLEEPING", p->priority);
+		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "SLEEPING", p->priority);
 	else if(p->state==RUNNABLE)
-		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "RUNNABLE", p->priority);
+		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "RUNNABLE", p->priority);
 	else if(p->state==ZOMBIE)
-		cprintf("%s\t%d \t %d \t %d \t 0 \t\n", p->name, p->pid, "ZOMBIE", p->priority);
+		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "ZOMBIE", p->priority);
 
     }
 
