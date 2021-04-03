@@ -596,6 +596,8 @@ void ps(void)
 		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "EMBRYO", p->priority);
 	else if(p->state==SLEEPING)
 		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "SLEEPING", p->priority);
+	else if(p->state==RUNNING)
+		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "RUNNING", p->priority);
 	else if(p->state==RUNNABLE)
 		cprintf("%s\t%d \t %s \t %d \t 0 \t\n", p->name, p->pid, "RUNNABLE", p->priority);
 	else if(p->state==ZOMBIE)
