@@ -199,7 +199,12 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-  np->priority = curproc->priority;
+  if(curproc->priority >= 15){
+    np->priority = curproc->priority / 2;
+  }
+  else if(curproc->priority < 15){
+    np->priority = curproc->priority + 1;
+  }
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -324,6 +329,9 @@ void
 scheduler(void)
 {
   struct proc *p;
+  struct proc *p2;
+  struct proc *pHigh;
+
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -337,9 +345,21 @@ scheduler(void)
       if(p->state != RUNNABLE)
         continue;
 
+      pHigh = p;
+      for(p2 = ptable.proc; p2 < &ptable.proc[NPROC]; p2++){
+        if(p2->state != RUNNABLE){
+	  continue;
+	}
+	if(pHigh->priority > p2->priority)
+	  pHigh = p2;
+      }
+
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
+  
+      p = pHigh;
+
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
