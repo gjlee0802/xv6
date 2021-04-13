@@ -206,6 +206,11 @@ fork(void)
     np->priority = curproc->priority + 1;
   }
 
+  //acquire(&ptable.lock);
+  //np->state = RUNNABLE;
+  //sched();
+  //release(&ptable.lock);
+
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -221,7 +226,9 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-  
+  myproc()->state = RUNNABLE;
+  sched();
+
   release(&ptable.lock);
 
   return pid;
@@ -406,10 +413,10 @@ sched(void)
 void
 yield(void)
 {
-  acquire(&ptable.lock);  //DOC: yieldlock
-  myproc()->state = RUNNABLE;
-  sched();
-  release(&ptable.lock);
+  //acquire(&ptable.lock);  //DOC: yieldlock
+  //myproc()->state = RUNNABLE;
+  //sched();
+  //release(&ptable.lock);
 }
 
 // A fork child's very first scheduling by scheduler()
