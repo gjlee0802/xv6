@@ -11,36 +11,105 @@ struct {
 	struct slab slab[NSLAB];
 } stable;
 
-char offset[9] = {64, 32, 16, 8, 4, 2, 1, 1, 1};
-
 void slabinit(){
-	/* fill in the blank */
-	int i;
-	int ssize = 8;
-	int page_size = 4096;
-	
 	acquire(&stable.lock);
-	for(i=0; i < NSLAB; i++){
+	/* fill in the blank */
+	int i, j;
+	int ssize = 8;
+	for(i=0; i<NSLAB; i++){
 		stable.slab[i].size = ssize;
 		stable.slab[i].num_pages = 1;
-		stable.slab[i].num_free_objects = page_size/stable.slab[i].size;
+		stable.slab[i].num_free_objects = 4096/stable.slab[i].size;
 		stable.slab[i].num_used_objects = 0;
-		stable.slab[i].num_objects_per_page = page_size/stable.slab[i].size;
-		stable.slab[i].bitmap = kalloc();
+		stable.slab[i].num_objects_per_page = 4096/stable.slab[i].size;
+		stable.slab[i].bitmap = kalloc(); 
+		if(stable.slab[i].size == 1024){
+			for(j=0; j<4096; j++)
+				stable.slab[i].bitmap[j]= -16;
+		}
+		else if(stable.slab[i].size == 2048){
+			for(j=0; j<4096; j++)
+				stable.slab[i].bitmap[j]= -4;
+		}
+		else{
+			for(j=0; j<4096; j++)
+				stable.slab[i].bitmap[j]= 0;
+		}
 		stable.slab[i].page[0] = kalloc();
-		ssize = ssize * 2;
+		ssize *= 2;
 	}
 	release(&stable.lock);
 }
 
-char get_bit(char Byte, int n){
-	return (Byte & (1 << (7-n))) >> (7-n);
-}
+char *kmalloc(int size){
+	/* fill in the blank */
+	int i = 0;
+	int ssize = 8;
+	
+	while(size > ssize){
+		ssize *= 2;
+		i++;
+	}
 
-char set_bit(char Byte, int n, int bit){
-	if(bit)
-		return Byte | (1 << (7-n));
-	return Byte & (~(1 << (7-n)));
+	int byte_per_page = stable.slab[i].num_objects_per_page/8;
+	if(byte_per_page == 0) byte_per_page++;
+
+	if(stable.slab[i].num_free_objects == 0){ // more page
+
+		acquire(&stable.lock);
+		// create new page
+		int pageidx = stable.slab[i].num_pages;
+		stable.slab[i].num_pages++;
+		cprintf("new page%d, %x ", pageidx, stable.slab[i].page[pageidx]);
+		stable.slab[i].page[pageidx] = kalloc();
+		cprintf("new page%d, %x\n", pageidx, stable.slab[i].page[pageidx]);
+		stable.slab[i].num_free_objects = stable.slab[i].num_objects_per_page;
+		
+		// new object in page's first slot.
+		stable.slab[i].num_free_objects--;
+		stable.slab[i].num_used_objects++;
+		stable.slab[i].bitmap[byte_per_page*pageidx] += 1;
+		
+		release(&stable.lock);
+		return stable.slab[i].page[pageidx];
+	}
+	else{ //find free slot
+		int bitidx;
+		int page = 0, obj = 0;
+		acquire(&stable.lock);
+		for(bitidx = 0; bitidx<4096; bitidx++){
+			if(stable.slab[i].bitmap[bitidx] != -1){ //free object
+				int bit = (int)(unsigned char)stable.slab[i].bitmap[bitidx];
+				int o1 = 0;
+				int o2 = 1;
+				while(bit != 0){
+					if(bit % 2 == 0){
+						break;
+					}
+					else{
+						o1++;
+						o2 *= 2;
+						bit /= 2;
+					}
+				}
+				//modify bitmap
+				stable.slab[i].num_free_objects--;
+				stable.slab[i].num_used_objects++;
+				stable.slab[i].bitmap[bitidx] += o2;
+				if(bitidx == 0){
+					page = 0;
+					obj = o1;
+				}
+				else{
+					page = bitidx/byte_per_page;
+					obj = (bitidx%byte_per_page)*8 + o1;
+				}
+				break;
+			}
+		}
+		release(&stable.lock);
+		return stable.slab[i].page[page] + obj*stable.slab[i].size; 
+	}
 }
 
 char *clear_bit(char *Byte, int i){
@@ -50,58 +119,6 @@ char *clear_bit(char *Byte, int i){
 	unsigned char cri = 0x80;
 	*(temp + i) = *(temp + i) & ~(cri >> i);
 	return temp;
-}
-
-int find_free_obj(int index, int page){
-	int i, j;
-	char *bitmap = stable.slab[index].bitmap + page*offset[index];
-	char Byte;
-
-	for(i=0; i < offset[index]; i++){
-		Byte = *(bitmap + i);
-		for(j=0; j < 8; j++){
-			if(j >= stable.slab[index].num_objects_per_page){
-				break;
-			}
-			if(get_bit(Byte, i) == 0){
-				*(bitmap + i) = set_bit(Byte, j, 1);
-				return i*8 + j;
-			}
-		}
-	}
-	return -1;
-}
-
-char *kmalloc(int size){
-	/* fill in the blank */
-	int index = 0;
-	int object = 0;
-	int ssize = 8;
-	while(size > ssize){
-		ssize = ssize * 2;
-		index++;
-	}
-
-	acquire(&stable.lock);
-	if(stable.slab[index].num_free_objects == 0){
-		stable.slab[index].page[stable.slab[index].num_pages] = kalloc();
-		stable.slab[index].num_pages++;
-		stable.slab[index].num_free_objects += stable.slab[index].num_objects_per_page;
-	}
-	
-	for(int i=0; i < stable.slab[index].num_pages; i++){
-		object = find_free_obj(index, i);	// bitmap
-		if(object != -1){
-			// update metadata
-			stable.slab[index].num_free_objects -= 1;
-			stable.slab[index].num_used_objects += 1;
-			release(&stable.lock);
-			return stable.slab[index].page[i] + object*stable.slab[index].size;
-		}
-	}
-
-	release(&stable.lock);
-	return 0;
 }
 
 void kmfree(char *addr, int size){
@@ -115,19 +132,19 @@ void kmfree(char *addr, int size){
 		ssize = ssize * 2;
 		i++;
 	}
-	int down_cnt=0;
+	int decrease_cnt=0;
 	for(j=0; j < stable.slab[i].num_pages; j++){
 		for(k=0; k < stable.slab[i].num_objects_per_page; k++){
 			if(addr == (stable.slab[i].page[j] + k*stable.slab[i].size)){
 				stable.slab[i].num_free_objects += 1;
 				stable.slab[i].num_used_objects -= 1;
 				clear_bit(stable.slab[i].bitmap, j * stable.slab[i].num_objects_per_page + k);
-				if(stable.slab[i].num_used_objects < ((stable.slab[i].num_pages - 1) + down_cnt) * stable.slab[i].num_objects_per_page){
+				if(stable.slab[i].num_used_objects < ((stable.slab[i].num_pages - 1) + decrease_cnt) * stable.slab[i].num_objects_per_page){
 					stable.slab[i].num_free_objects -= stable.slab[i].num_objects_per_page;
-					kfree(stable.slab[i].page[stable.slab[i].num_pages - 1 + down_cnt]);
-					down_cnt--;
+					kfree(stable.slab[i].page[stable.slab[i].num_pages - 1 + decrease_cnt]);
+					decrease_cnt--;
 				}
-				stable.slab[i].num_pages += down_cnt;
+				stable.slab[i].num_pages += decrease_cnt;
 				release(&stable.lock);
 				return;
 			}
@@ -139,16 +156,10 @@ void kmfree(char *addr, int size){
 }
 
 void slabdump(){
-
-	cprintf("__slabdump__\n");
-
 	struct slab *s;
+
 	cprintf("size\tnum_pages\tused_objects\tfree_objects\n");
-	
 	for(s = stable.slab; s < &stable.slab[NSLAB]; s++){
-		cprintf("%d\t%d\t\t%d\t\t%d\n", 
-			s->size, s->num_pages, s->num_used_objects, s->num_free_objects);
+		cprintf("%d\t%d\t\t%d\t\t%d\n", s->size, s->num_pages, s->num_used_objects, s->num_free_objects);
 	}
-
 }
-
