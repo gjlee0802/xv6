@@ -63,7 +63,7 @@ int find_free_obj(int index, int page){
 			if(j >= stable.slab[index].num_objects_per_page){
 				break;
 			}
-			if(!get_bit(Byte, i)){
+			if(get_bit(Byte, i) == 0){
 				*(bitmap + i) = set_bit(Byte, j, 1);
 				return i*8 + j;
 			}
@@ -87,13 +87,10 @@ char *kmalloc(int size){
 		stable.slab[index].page[stable.slab[index].num_pages] = kalloc();
 		stable.slab[index].num_pages++;
 		stable.slab[index].num_free_objects += stable.slab[index].num_objects_per_page;
-		
-		release(&stable.lock);
-		return stable.slab[index].page[stable.slab[index].num_pages];
 	}
 	
 	for(int i=0; i < stable.slab[index].num_pages; i++){
-		object = find_free_obj(index, i);
+		object = find_free_obj(index, i);	// bitmap
 		if(object != -1){
 			// update metadata
 			stable.slab[index].num_free_objects -= 1;
@@ -107,48 +104,51 @@ char *kmalloc(int size){
 	return 0;
 }
 
-void kmfree(char *addr){
+void kmfree(char *addr, int size){
 	/* fill in the blank */
-	int i, j, k;
+	int i=0, j, k;
+	int ssize = 8;
 
 	acquire(&stable.lock);
 	
-	for(i=0; i < NSLAB; i++){
-		int down_cnt=0;
-		for(j=0; j < stable.slab[i].num_pages; j++){
-			for(k=0; k < stable.slab[i].num_objects_per_page; k++){
-				if(addr == (stable.slab[i].page[j] + k*stable.slab[i].size)){
-					//Byte = *(stable.slab[i].bitmap + j*offset[i] + k/8);
-					//*(stable.slab[i].bitmap + j*offset[i] + k/8) = set_bit(Byte, k%8, 0);
-					// update metadata
-					stable.slab[i].num_free_objects += 1;
-					stable.slab[i].num_used_objects -= 1;
-					clear_bit(stable.slab[i].bitmap, j * stable.slab[i].num_objects_per_page + k);
-					if(stable.slab[i].num_used_objects < ((stable.slab[i].num_pages - 1) + down_cnt) * stable.slab[i].num_objects_per_page){
-						stable.slab[i].num_free_objects -= stable.slab[i].num_objects_per_page;
-						kfree(stable.slab[i].page[stable.slab[i].num_pages - 1 + down_cnt]);
-						down_cnt--;
-					}
-					stable.slab[i].num_pages += down_cnt;
-					release(&stable.lock);
-					return;
+	while(size > ssize){
+		ssize = ssize * 2;
+		i++;
+	}
+	int down_cnt=0;
+	for(j=0; j < stable.slab[i].num_pages; j++){
+		for(k=0; k < stable.slab[i].num_objects_per_page; k++){
+			if(addr == (stable.slab[i].page[j] + k*stable.slab[i].size)){
+				stable.slab[i].num_free_objects += 1;
+				stable.slab[i].num_used_objects -= 1;
+				clear_bit(stable.slab[i].bitmap, j * stable.slab[i].num_objects_per_page + k);
+				if(stable.slab[i].num_used_objects < ((stable.slab[i].num_pages - 1) + down_cnt) * stable.slab[i].num_objects_per_page){
+					stable.slab[i].num_free_objects -= stable.slab[i].num_objects_per_page;
+					kfree(stable.slab[i].page[stable.slab[i].num_pages - 1 + down_cnt]);
+					down_cnt--;
 				}
+				stable.slab[i].num_pages += down_cnt;
+				release(&stable.lock);
+				return;
 			}
 		}
 	}
+	
 	release(&stable.lock);
 	return;
 }
 
 void slabdump(){
+
 	cprintf("__slabdump__\n");
 
 	struct slab *s;
-	
 	cprintf("size\tnum_pages\tused_objects\tfree_objects\n");
 	
 	for(s = stable.slab; s < &stable.slab[NSLAB]; s++){
 		cprintf("%d\t%d\t\t%d\t\t%d\n", 
 			s->size, s->num_pages, s->num_used_objects, s->num_free_objects);
 	}
+
 }
+

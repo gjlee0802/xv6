@@ -28,7 +28,7 @@ void slabtest(){
 	
 	cprintf("T2\n");
 	for(i=NTEST-1;i>=0;i--){
-		kmfree((char *)t[i]);
+		kmfree((char *)t[i], TESTALLOCSIZE);
 	}
 #endif
 	slabdump();

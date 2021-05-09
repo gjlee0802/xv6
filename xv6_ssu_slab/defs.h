@@ -71,7 +71,7 @@ void            kinit2(void*, void*);
 
 // slab.c
 char*			kmalloc(int);
-void			kmfree(char*);
+void			kmfree(char*, int);
 void			slabdump();
 void			slabinit();
 
