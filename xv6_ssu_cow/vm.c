@@ -7,6 +7,8 @@
 #include "proc.h"
 #include "elf.h"
 
+#define COW
+
 extern char data[];  // defined by kernel.ld
 pde_t *kpgdir;  // for use in scheduler()
 
@@ -314,7 +316,7 @@ clearpteu(pde_t *pgdir, char *uva)
 // of it for a child.
 pde_t*
 copyuvm(pde_t *pgdir, uint sz)
-{  
+{
   pde_t *d;
   pte_t *pte;
   uint pa, i, flags;
@@ -390,33 +392,39 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-
+#ifdef COW
 void
 page_fault(void)
-{ uint pa ;
+{ 
+  uint pa ;
   pte_t *pte;
- uint ref_counter;
-	uint va = rcr2(); 
+  uint ref_cnt;
+  uint va = rcr2(); 
+  
   if(va<0 ||va >KERNBASE)
-  panic("wrong memory access!!");   
+  	panic("wrong memory access!!");   
+  
   struct proc * p=myproc();
+  
   if((pte=walkpgdir(p->pgdir ,(void *)va,0))==0)
-    panic("wrong!!");
-     pa= PTE_ADDR(*pte);
-     ref_counter=get_ref(pa);
-    if (ref_counter>1) 
-    {  
-       char *mem;     
-       if(((mem= kalloc())==0))
-       panic("wrong!!"); 
-       *pte = V2P(mem) | PTE_P | PTE_W | PTE_U ; 
+  	panic("wrong!!");
+  
+  pa= PTE_ADDR(*pte);
+  ref_cnt=get_ref(pa);
+
+  if(ref_cnt > 1) 
+  {  
+        char *mem;     
+        if(((mem = kalloc()) == 0))
+        panic("wrong!!"); 
+        *pte = V2P(mem) | PTE_P | PTE_W | PTE_U ; 
         dec_ref(pa);
-          memmove(mem, (char *)P2V(pa),PGSIZE);
-    }
-    else if(ref_counter ==1)
-    {   
+  	memmove(mem, (char *)P2V(pa),PGSIZE);
+  }
+  else if(ref_cnt == 1)
+  {   
        *pte |= PTE_W;
-    }
+  }
   else
   {  
     panic("wrong");
@@ -424,7 +432,7 @@ page_fault(void)
   	
 lcr3(V2P(p->pgdir));
 }
-
+#endif
 
 //PAGEBREAK!
 // Blank page.

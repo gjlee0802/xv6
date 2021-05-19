@@ -9,16 +9,19 @@
 #include "mmu.h"
 #include "spinlock.h"
 
+#define COW
+
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
                    // defined by the kernel linker script in kernel.ld
-
+#ifdef COW
 struct {
 	struct spinlock lock;
 	int use_lock;
 	int numfreepages;
 	uint ref[PHYSTOP >> PGSHIFT];
 } pmem;
+#endif
 
 struct run {
   struct run *next;
@@ -38,8 +41,10 @@ struct {
 void
 kinit1(void *vstart, void *vend)
 {
-	initlock(&pmem.lock, "pmemlock");
-	pmem.use_lock = 0;
+#ifdef COW
+  initlock(&pmem.lock, "pmemlock");
+  pmem.use_lock = 0;
+#endif
   initlock(&kmem.lock, "kmem");
   kmem.use_lock = 0;
   freerange(vstart, vend);
@@ -47,12 +52,14 @@ kinit1(void *vstart, void *vend)
 
 void
 kinit2(void *vstart, void *vend)
-{   
-	pmem.use_lock = 1;
-        acquire(&pmem.lock);
-	memset(&pmem.ref, 0, sizeof(uint) * (PHYSTOP >> PGSHIFT));	
-	pmem.numfreepages = 0;
-	release(&pmem.lock);
+{
+#ifdef COW	
+  pmem.use_lock = 1;
+  acquire(&pmem.lock);
+  memset(&pmem.ref, 0, sizeof(uint) * (PHYSTOP >> PGSHIFT));	
+  pmem.numfreepages = 0;
+  release(&pmem.lock);
+#endif
   freerange(vstart, vend);
   kmem.use_lock = 1;
 }
@@ -65,6 +72,8 @@ freerange(void *vstart, void *vend)
   for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
     kfree(p);
 }
+
+#ifdef COW
 // reference counter APIs 
 int freemem()
 {
@@ -99,6 +108,8 @@ dec_ref(uint pa)
        { pmem.ref[pa>>PGSHIFT]--;}
           release(&pmem.lock);
 }
+#endif
+
 //PAGEBREAK: 21
 // Free the page of physical memory pointed at by v,
 // which normally should have been returned by a
@@ -121,24 +132,22 @@ kfree(char *v)
        acquire(&pmem.lock); 
    count = pmem.ref[pa];
    if(count >0)
-  { --pmem.ref[pa];
+   { --pmem.ref[pa];
        count --;}
        
-if(count==0){
-  r = (struct run*)v;
-  memset(v,1,PGSIZE);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  pmem.numfreepages ++;
- }
+  if(count==0){
+  	r = (struct run*)v;
+  	memset(v,1,PGSIZE);
+  	r->next = kmem.freelist;
+  	kmem.freelist = r;
+  	pmem.numfreepages ++;
+  }
   if(kmem.use_lock)
     release(&kmem.lock);
-         
-
-
-	if(pmem.use_lock)
-		release(&pmem.lock);
-
+#ifdef COW
+  if(pmem.use_lock)
+  release(&pmem.lock);
+#endif
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -153,16 +162,19 @@ kalloc(void)
     acquire(&kmem.lock);
   r = kmem.freelist;
   if(r){
-    kmem.freelist = r->next;
-  pa=V2P((char*)r)>>PGSHIFT;
-		if(pmem.use_lock)
-			acquire(&pmem.lock);                   
-                 pmem.ref[pa]++;
-		pmem.numfreepages--;
-		if(pmem.use_lock)
-			release(&pmem.lock);
+   	kmem.freelist = r->next;
 
-	}
+  	pa=V2P((char*)r)>>PGSHIFT;
+
+#ifdef COW
+	if(pmem.use_lock)
+		acquire(&pmem.lock);                   
+                pmem.ref[pa]++;
+		pmem.numfreepages--;
+	if(pmem.use_lock)
+		release(&pmem.lock);
+#endif
+  }
   if(kmem.use_lock)
     release(&kmem.lock);
 
