@@ -163,14 +163,12 @@ kalloc(void)
   r = kmem.freelist;
   if(r){
    	kmem.freelist = r->next;
-
   	pa=V2P((char*)r)>>PGSHIFT;
-
 #ifdef COW
 	if(pmem.use_lock)
 		acquire(&pmem.lock);                   
-                pmem.ref[pa]++;
-		pmem.numfreepages--;
+        pmem.ref[pa]++;
+	pmem.numfreepages--;
 	if(pmem.use_lock)
 		release(&pmem.lock);
 #endif
